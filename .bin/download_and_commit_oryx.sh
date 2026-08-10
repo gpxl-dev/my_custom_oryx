@@ -94,6 +94,15 @@ git push origin main
 
 # qmk_firmware is already present and initialized, so qmk setup is neither
 # needed nor allowed to prompt for replacing it.
+# QMK's Homebrew ARM GCC 8 toolchain is keg-only on macOS.
+if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null; then
+    arm_gcc_bin="$(brew --prefix arm-none-eabi-gcc@8 2>/dev/null || true)/bin"
+    arm_binutils_bin="$(brew --prefix arm-none-eabi-binutils 2>/dev/null || true)/bin"
+    if [[ -x "$arm_gcc_bin/arm-none-eabi-gcc" ]]; then
+        export PATH="$arm_gcc_bin:$arm_binutils_bin:$PATH"
+    fi
+fi
+
 cd qmk_firmware
 qmk config user.overlay_dir="$repo_dir/userspace"
 if [[ -n "$keyboard_directory" ]]; then
