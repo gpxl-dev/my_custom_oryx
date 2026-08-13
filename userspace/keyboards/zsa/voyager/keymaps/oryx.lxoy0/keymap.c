@@ -550,4 +550,7 @@ void leader_end_user(void) {
     STATUS_LED_2(false);
     STATUS_LED_3(false);
     STATUS_LED_4(false);
+
+    // Restore the binary indicator for the active layer after the leader pattern.
+    layer_state_set_kb(layer_state);
 }
