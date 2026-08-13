@@ -98,6 +98,10 @@ combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo5, LCTL(KC_F)),
 };
 
+uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
+    return combo_index == 5 ? 40 : COMBO_TERM;
+}
+
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case LT(4, KC_E):

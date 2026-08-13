@@ -209,6 +209,13 @@ bool process_case_modes(uint16_t keycode, const keyrecord_t *record) {
             }
         }
 
+        // Consume both edges of a tapped Space mod-tap while xcase handles it.
+        // Letting the release through after consuming the press can activate its
+        // hold modifier, such as GUI on the right thumb key.
+        if (xcase_state == XCASE_ON && keycode == KC_SPACE && !record->event.pressed) {
+            return false;
+        }
+
         if (record->event.pressed) {
             // handle xcase mode
             if (xcase_state == XCASE_ON) {
