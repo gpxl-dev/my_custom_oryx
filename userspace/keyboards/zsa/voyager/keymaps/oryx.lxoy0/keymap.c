@@ -356,7 +356,7 @@ tap_dance_action_t tap_dance_actions[] = {
 
 
 
-#define APP_CYCLE_TIMEOUT 500
+#define APP_CYCLE_TIMEOUT 1000
 static bool app_cycle_active = false;
 static bool app_cycle_owns_cmd = false;
 static uint32_t app_cycle_timer;
