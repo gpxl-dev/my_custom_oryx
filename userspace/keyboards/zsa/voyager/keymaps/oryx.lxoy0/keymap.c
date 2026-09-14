@@ -23,6 +23,7 @@ enum custom_keycodes {
   ST_MACRO_0,
   ST_MACRO_1,
   CAPSWORD,
+  APP_CYCLE,
 };
 
 
@@ -72,11 +73,12 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_TRANSPARENT, KC_F6,          KC_F7,          KC_F8,          KC_F9,          KC_F10,                                         LGUI(KC_GRAVE), KC_KP_EQUAL,    KC_KP_0,        KC_KP_DOT,      KC_KP_SLASH,    KC_TRANSPARENT,
                                                     KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT
   ),
+  // Unassigned mouse-layer keys return to base without sending the underlying key.
   [5] = LAYOUT_voyager(
-    TO(0),          KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_MS_BTN3,     KC_TRANSPARENT, KC_TRANSPARENT, KC_MS_ACCEL2,   
-    KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_MS_WH_UP,                                    KC_TRANSPARENT, KC_MS_BTN1,     KC_MS_BTN2,     KC_TRANSPARENT, KC_MS_WH_UP,    KC_MS_ACCEL1,   
-    KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_MS_BTN2,     KC_MS_BTN1,     KC_TRANSPARENT,                                 KC_MS_LEFT,     KC_MS_DOWN,     KC_MS_UP,       KC_MS_RIGHT,    KC_MS_WH_DOWN,  KC_MS_ACCEL0,   
-    KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, 
+    TO(0),          TO(0),          TO(0),          TO(0),          TO(0),          TO(0),                                          TO(0),          TO(0),          KC_MS_BTN3,     TO(0),          TO(0),          KC_MS_ACCEL2,
+    TO(0),          TO(0),          TO(0),          TO(0),          TO(0),          KC_MS_WH_UP,                                    TO(0),          KC_MS_BTN1,     KC_MS_BTN2,     TO(0),          KC_MS_WH_UP,    KC_MS_ACCEL1,
+    TO(0),          TO(0),          TO(0),          KC_MS_BTN2,     KC_MS_BTN1,     TO(0),                                          KC_MS_LEFT,     KC_MS_DOWN,     KC_MS_UP,       KC_MS_RIGHT,    KC_MS_WH_DOWN,  KC_MS_ACCEL0,
+    TO(0),          TO(0),          TO(0),          TO(0),          TO(0),          TO(0),                                          TO(0),          TO(0),          TO(0),          TO(0),          TO(0),          TO(0),
                                                     KC_MS_BTN1,     KC_MS_BTN2,                                     KC_MS_BTN1,     KC_MS_BTN2
   ),
 };
@@ -89,6 +91,8 @@ const uint16_t PROGMEM combo3[] = { KC_K, KC_L, COMBO_END};
 const uint16_t PROGMEM combo4[] = { MT(MOD_LCTL, KC_S), LT(3, KC_D), COMBO_END};
 const uint16_t PROGMEM combo5[] = { MT(MOD_LSFT, KC_A), KC_RIGHT_SHIFT, COMBO_END};
 
+const uint16_t PROGMEM combo6[] = { MT(MOD_RALT, KC_M), KC_COMMA, COMBO_END};
+
 combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo0, KC_ESCAPE),
     COMBO(combo1, RALT(KC_BSPC)),
@@ -96,6 +100,7 @@ combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo3, KC_RIGHT_SHIFT),
     COMBO(combo4, KC_LEFT_SHIFT),
     COMBO(combo5, LCTL(KC_F)),
+    COMBO(combo6, APP_CYCLE),
 };
 
 uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
@@ -351,7 +356,43 @@ tap_dance_action_t tap_dance_actions[] = {
 
 
 
+#define APP_CYCLE_TIMEOUT 500
+static bool app_cycle_active = false;
+static bool app_cycle_owns_cmd = false;
+static uint32_t app_cycle_timer;
+
+static void app_cycle_end(void) {
+    if (app_cycle_owns_cmd) {
+        unregister_code(KC_LGUI);
+    }
+    app_cycle_active = false;
+    app_cycle_owns_cmd = false;
+}
+
+void housekeeping_task_user(void) {
+    if (app_cycle_active && timer_elapsed32(app_cycle_timer) >= APP_CYCLE_TIMEOUT) {
+        app_cycle_end();
+    }
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == APP_CYCLE) {
+        if (record->event.pressed) {
+            if (!app_cycle_active) {
+                // Do not release Command if the user was already holding it.
+                app_cycle_owns_cmd = !(get_mods() & MOD_BIT(KC_LGUI));
+                register_code(KC_LGUI);
+                app_cycle_active = true;
+            }
+            tap_code(KC_TAB);
+            app_cycle_timer = timer_read32();
+        }
+        return false;
+    }
+    if (app_cycle_active && record->event.pressed) {
+        app_cycle_end();
+    }
+
     if (keycode == MT(MOD_LGUI, KC_ENTER) || keycode == MT(MOD_RGUI, KC_SPACE)) { // start a timer when Cmd is pressed
         cmd_timer = record->event.pressed ? timer_read32() : 0; // Track Cmd press time
     }
