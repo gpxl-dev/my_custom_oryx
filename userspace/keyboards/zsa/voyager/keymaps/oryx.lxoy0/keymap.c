@@ -18,12 +18,18 @@ enum {
 static uint8_t vim_seq_state = VIM_SEQ_NONE;
 static uint32_t cmd_timer = 0; // Timer for Command hold duration
 
+// One-handed mirror: the X+C combo makes the next non-thumb key act as its
+// mirror on the other half (on whatever layer is active).
+static bool mirror_next = false;
+static bool mirror_pressed[MATRIX_ROWS][MATRIX_COLS];
+
 enum custom_keycodes {
   RGB_SLD = ZSA_SAFE_RANGE,
   ST_MACRO_0,
   ST_MACRO_1,
   CAPSWORD,
   APP_CYCLE,
+  MIRROR_NEXT,
 };
 
 
@@ -92,6 +98,7 @@ const uint16_t PROGMEM combo4[] = { MT(MOD_LCTL, KC_S), LT(3, KC_D), COMBO_END};
 const uint16_t PROGMEM combo5[] = { MT(MOD_LSFT, KC_A), KC_RIGHT_SHIFT, COMBO_END};
 
 const uint16_t PROGMEM combo6[] = { MT(MOD_RALT, KC_M), KC_COMMA, COMBO_END};
+const uint16_t PROGMEM combo7[] = { KC_X, KC_C, COMBO_END};
 
 combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo0, KC_ESCAPE),
@@ -101,6 +108,7 @@ combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo4, KC_LEFT_SHIFT),
     COMBO(combo5, LCTL(KC_F)),
     COMBO(combo6, APP_CYCLE),
+    COMBO(combo7, MIRROR_NEXT),
 };
 
 uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
@@ -219,6 +227,14 @@ bool rgb_matrix_indicators_user(void) {
   } else {
     if (rgb_matrix_get_flags() == LED_FLAG_NONE) {
       rgb_matrix_set_color_all(0, 0, 0);
+    }
+  }
+
+  // Light the left half (LEDs 0-23, excluding thumbs) while the mirror is armed.
+  if (mirror_next) {
+    RGB rgb = hsv_to_rgb_with_value((HSV){ 128, 255, 255 });
+    for (uint8_t i = 0; i < 24; i++) {
+      rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
   }
 
@@ -375,7 +391,48 @@ void housekeeping_task_user(void) {
     }
 }
 
+// Swap the key position for its mirror before combos, tap-hold and layer
+// lookup see it. Voyager matrix: left half is rows 0-5, right half rows 6-11
+// with columns reversed. Rows 5 and 11 hold only the thumb keys, which never
+// mirror and don't use up the mirror (so the symbol key can be held first).
+bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    keypos_t *key = &record->event.key;
+    if (!IS_KEYEVENT(record->event) || key->row >= MATRIX_ROWS || key->row % 6 == 5) {
+        return true;
+    }
+    uint8_t row = key->row;
+    uint8_t col = key->col;
+    // The Esc position cancels the mirror instead of sending its mirror (Repeat).
+    // Swallow both the press and its release.
+    static bool cancel_held = false;
+    if (row == 0 && col == 1 && (mirror_next || cancel_held)) {
+        mirror_next = false;
+        cancel_held = record->event.pressed;
+        return false;
+    }
+    if (record->event.pressed) {
+        mirror_pressed[row][col] = mirror_next;
+        mirror_next = false;
+    }
+    // Releases follow whatever the press did, even though the mirror is now off.
+    if (mirror_pressed[row][col]) {
+        key->row = (row + MATRIX_ROWS / 2) % MATRIX_ROWS;
+        key->col = MATRIX_COLS - 1 - col;
+        if (!record->event.pressed) {
+            mirror_pressed[row][col] = false;
+        }
+    }
+    return true;
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == MIRROR_NEXT) {
+        if (record->event.pressed) {
+            mirror_next = true;
+        }
+        return false;
+    }
+
     if (keycode == APP_CYCLE) {
         if (record->event.pressed) {
             if (!app_cycle_active) {
