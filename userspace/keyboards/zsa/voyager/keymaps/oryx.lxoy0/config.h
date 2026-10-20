@@ -13,7 +13,7 @@
 
 #define SERIAL_NUMBER "lXoY0/wOXMn9"
 #define LAYER_STATE_8BIT
-#define COMBO_COUNT 5
+#define COMBO_COUNT 4
 #define COMBO_TERM_PER_COMBO
 
 #define TAPPING_TERM_PER_KEY

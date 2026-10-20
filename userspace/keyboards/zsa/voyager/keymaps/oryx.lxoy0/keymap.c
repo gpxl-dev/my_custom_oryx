@@ -28,7 +28,6 @@ enum custom_keycodes {
   ST_MACRO_0,
   ST_MACRO_1,
   CAPSWORD,
-  APP_CYCLE,
   MIRROR_NEXT,
 };
 
@@ -94,15 +93,13 @@ const uint16_t PROGMEM combo0[] = { MT(MOD_LGUI, KC_ENTER), MT(MOD_RGUI, KC_SPAC
 const uint16_t PROGMEM combo1[] = { KC_J, KC_K, COMBO_END};
 const uint16_t PROGMEM combo2[] = { MT(MOD_LSFT, KC_A), KC_RIGHT_SHIFT, COMBO_END};
 
-const uint16_t PROGMEM combo3[] = { MT(MOD_RALT, KC_M), KC_COMMA, COMBO_END};
-const uint16_t PROGMEM combo4[] = { KC_X, KC_C, COMBO_END};
+const uint16_t PROGMEM combo3[] = { KC_X, KC_C, COMBO_END};
 
 combo_t key_combos[COMBO_COUNT] = {
     COMBO(combo0, KC_ESCAPE),
     COMBO(combo1, RALT(KC_BSPC)),
     COMBO(combo2, LCTL(KC_F)),
-    COMBO(combo3, APP_CYCLE),
-    COMBO(combo4, MIRROR_NEXT),
+    COMBO(combo3, MIRROR_NEXT),
 };
 
 uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
@@ -366,25 +363,6 @@ tap_dance_action_t tap_dance_actions[] = {
 
 
 
-#define APP_CYCLE_TIMEOUT 1000
-static bool app_cycle_active = false;
-static bool app_cycle_owns_cmd = false;
-static uint32_t app_cycle_timer;
-
-static void app_cycle_end(void) {
-    if (app_cycle_owns_cmd) {
-        unregister_code(KC_LGUI);
-    }
-    app_cycle_active = false;
-    app_cycle_owns_cmd = false;
-}
-
-void housekeeping_task_user(void) {
-    if (app_cycle_active && timer_elapsed32(app_cycle_timer) >= APP_CYCLE_TIMEOUT) {
-        app_cycle_end();
-    }
-}
-
 // Swap the key position for its mirror before combos, tap-hold and layer
 // lookup see it. Voyager matrix: left half is rows 0-5, right half rows 6-11
 // with columns reversed. Rows 5 and 11 hold only the thumb keys, which never
@@ -425,23 +403,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             mirror_next = true;
         }
         return false;
-    }
-
-    if (keycode == APP_CYCLE) {
-        if (record->event.pressed) {
-            if (!app_cycle_active) {
-                // Do not release Command if the user was already holding it.
-                app_cycle_owns_cmd = !(get_mods() & MOD_BIT(KC_LGUI));
-                register_code(KC_LGUI);
-                app_cycle_active = true;
-            }
-            tap_code(KC_TAB);
-            app_cycle_timer = timer_read32();
-        }
-        return false;
-    }
-    if (app_cycle_active && record->event.pressed) {
-        app_cycle_end();
     }
 
     if (keycode == MT(MOD_LGUI, KC_ENTER) || keycode == MT(MOD_RGUI, KC_SPACE)) { // start a timer when Cmd is pressed
